@@ -109,19 +109,19 @@ void setup() {
   }
 
   //删除并创建文件
-  sd.remove(filename);
-  file = sd.open(filename, O_WRITE|O_CREAT);
-  if(!file)
-  {
-    Serial.println("crate file error");
-    return;
-  }
+  // sd.remove(filename);
+  // file = sd.open(filename, O_WRITE|O_CREAT);
+  // if(!file)
+  // {
+  //   Serial.println("crate file error");
+  //   return;
+  // }
 
-  auto header = CreateWaveHeader(1, 44100, 16);
-  header.riffSize = waveDataSize + 44 - 8;
-  header.dataSize = waveDataSize;
-  // client.write((uint8_t*)&header, 44);
-  file.write(&header, 44);
+  // auto header = CreateWaveHeader(1, 44100, 16);
+  // header.riffSize = waveDataSize + 44 - 8;
+  // header.dataSize = waveDataSize;
+  // // client.write((uint8_t*)&header, 44);
+  // file.write(&header, 44);
 
   if(!mi.InitInput(I2S_BITS_PER_SAMPLE_32BIT, 17, 21, 4))
   {
@@ -129,28 +129,28 @@ void setup() {
     return;
   }
 
-  Serial.println("start");
+  // Serial.println("start");
 
-  for (int j = 0; j < waveDataSize/1024; ++j) {
-    Serial.printf("read\n");
-    auto sz = mi.Read((char*)communicationData, 4096);
+  // for (int j = 0; j < waveDataSize/1024; ++j) {
+  //   Serial.printf("read\n");
+  //   auto sz = mi.Read((char*)communicationData, 4096);
     
 
-    char*p =(char*)(communicationData);
-    for(int i=0;i<sz/4;i++)
-    {
-      communicationData[i] *= 10;  //提高声音
-      if(i%2 == 0)   //这里获取到的数据第一个Int32是右声道
-      {
-          partWavData[i] = p[4*i + 2];
-          partWavData[i + 1] = p[4*i + 3];
-      }
-    }
-    file.write((const byte*)partWavData, 1024);
-    // client.write((const byte*)partWavData, 1024);
-  }
-  file.close();
-  Serial.println("finish save");
+  //   char*p =(char*)(communicationData);
+  //   for(int i=0;i<sz/4;i++)
+  //   {
+  //     communicationData[i] *= 10;  //提高声音
+  //     if(i%2 == 0)   //这里获取到的数据第一个Int32是右声道
+  //     {
+  //         partWavData[i] = p[4*i + 2];
+  //         partWavData[i + 1] = p[4*i + 3];
+  //     }
+  //   }
+  //   file.write((const byte*)partWavData, 1024);
+  //   // client.write((const byte*)partWavData, 1024);
+  // }
+  // file.close();
+  // Serial.println("finish save");
   // client.flush();
   // client.stop();
   
