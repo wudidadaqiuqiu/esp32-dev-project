@@ -4,6 +4,14 @@
 #include "wave.h"
 #include <WiFi.h>
 #include <EEPROM.h>            // read and write from flash memory
+#include <U8g2lib.h>
+
+U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2     //硬件I2C
+(U8G2_R0, 
+/* clock=*/ 25, 
+/* data=*/ 27, 
+/* reset=*/ U8X8_PIN_NONE); // 没有重置显示的所有板
+#define TEST_OLED 0
 
 SdFs sd;      // sd卡
 FsFile file;  // 录音文件
@@ -18,7 +26,7 @@ const char *password = "12345678";
 const int waveDataSize = record_time * 88200;
 int32_t communicationData[1024];     //接收缓冲区
 char partWavData[1024];
-IPAddress serverIP(192, 168, 248, 110);
+IPAddress serverIP(192, 168, 248, 29);
 uint16_t serverPort = 3334;
 uint16_t server_end_port = 3335;
 
@@ -37,6 +45,49 @@ void wifi_setup() {
   Serial.println("");
   Serial.println("WiFi connected");
   Serial.print(WiFi.localIP());
+}
+
+void task1(void *pvParameters);
+
+void u8g2_setup() {
+  u8g2.setBusClock(800000);     //设置时钟
+  u8g2.begin();//初始化
+  u8g2.enableUTF8Print();       //允许UTF8
+}
+
+static unsigned int start = 0;
+static unsigned int end = 0;
+static int duration;
+
+void graph_setup() {
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_ncenB12_tr);        //设定字体
+  u8g2.drawStr(0, 13, "recorder");       //在指定位置显示字符串
+  u8g2.sendBuffer();
+}
+void graph_record() {
+  if (start == 0) {
+    start = millis();
+  }
+  end = millis();
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_ncenB12_tr);        //设定字体
+  u8g2.drawStr(0, 13, "Recording");       //在指定位置显示字符串
+  u8g2.setCursor(0, 30);
+  u8g2.print(end - start);
+  u8g2.sendBuffer();
+}
+
+void graph_end_record() {
+  if (end != 0 && start != 0)
+    duration = end - start;
+  start = end = 0;
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_ncenB12_tr);        //设定字体
+  u8g2.drawStr(0, 13, "Record End");       //在指定位置显示字符串
+  u8g2.setCursor(0, 30);
+  u8g2.print(duration);
+  u8g2.sendBuffer();
 }
 
 void reset_record() {
@@ -183,15 +234,23 @@ void setup() {
   // client.stop();
   
   pinMode(gpio_, INPUT);
+
+  u8g2_setup();
+  graph_setup();
+  
+  xTaskCreate(task1, "Task 1", 4096, NULL, 1, NULL);
+  vTaskStartScheduler();
 }
+static int level;
+static int last_level;
 
 void loop() {
   // put your main code here, to run repeatedly:
   delay(500);
   static int cnt = 0;
   // 读取引脚的电平状态
-  int level = digitalRead(gpio_);
-  static int last_level;
+  level = digitalRead(gpio_);
+  
   // 输出引脚的电平状态
   Serial.print("GPIO pin ");
   Serial.print(gpio_);
@@ -200,13 +259,32 @@ void loop() {
 
   
   if (level) {
-    
+    #if !TEST_OLED
     save_record();
-    
+    #else
+    delay(1000);
+    #endif
   } else if (last_level) {
+    #if !TEST_OLED
     end_record();
+    #else
+    delay(1000);
+    #endif
     last_level = 0;
   }
+  // graph_end_record();
   last_level = level;
 
+}
+
+void task1(void *pvParameters) {
+  while (1) {
+    if (level) {
+      graph_record();
+    } else if (last_level) {
+      graph_end_record();
+    }
+    vTaskDelay(1);
+  }
+  
 }

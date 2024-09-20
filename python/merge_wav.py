@@ -1,4 +1,5 @@
 import sys
+from pydub import AudioSegment
 
 # path = sys.argv[1]
 # print(path)
@@ -16,19 +17,20 @@ def concatenate_wav_files(directory, prefix):
     
     # print
     # 初始化一个空的numpy数组来存储拼接后的音频数据
-    concatenated_data = b''
+    concatenated_data = AudioSegment.empty()
     
     for file_name in file_names:
         file_path = os.path.join(directory, file_name)
         
         # 打开WAV文件
-        with open(file_path, 'rb') as wav_file:
-            # 读取音频数据
-            audio_data = wav_file.read()
-            audio_data = audio_data[44:]  # 去掉WAV文件的头部信息
-            # 拼接音频数据
-            concatenated_data += audio_data
-    
+        # with open(file_path, 'rb') as wav_file:
+        #     # 读取音频数据
+        #     audio_data = wav_file.read()
+        #     audio_data = audio_data[44:]  # 去掉WAV文件的头部信息
+        #     # 拼接音频数据
+        #     concatenated_data += audio_data
+        concatenated_data += AudioSegment.from_wav(file_path)
+
     # 返回拼接后的音频数据
     return concatenated_data
 
@@ -41,12 +43,13 @@ concatenated_audio = concatenate_wav_files(directory, prefix)
 
 # 将拼接后的音频数据写入新的WAV文件
 output_file = os.path.join(directory, 'concatenated.wav')
-with wave.open(output_file, 'wb') as wav_file:
-    # 设置音频参数
-    wav_file.setnchannels(1)  # 单声道
-    wav_file.setsampwidth(2)  # 16位
-    wav_file.setframerate(44100)  # 44.1kHz采样率
-    # 写入音频数据
-    wav_file.writeframes(concatenated_audio)
+# with wave.open(output_file, 'wb') as wav_file:
+#     # 设置音频参数
+#     wav_file.setnchannels(1)  # 单声道
+#     wav_file.setsampwidth(2)  # 16位
+#     wav_file.setframerate(44100)  # 44.1kHz采样率
+#     # 写入音频数据
+#     wav_file.writeframes(concatenated_audio)
 
+concatenated_audio.export(output_file,format='wav')
 print(f"音频文件已拼接并保存为 {output_file}")
