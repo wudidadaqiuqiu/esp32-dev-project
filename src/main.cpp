@@ -143,6 +143,7 @@ void record_plus() {
 }
 
 void end_record() {
+  Serial.println("end record");
   if (start_tran) {
     if (!end_client.connected()) {
       while (!end_client.connect(serverIP, server_end_port, 1000)) {
@@ -310,26 +311,27 @@ void loop() {
   Serial.print("GPIO pin ");
   Serial.print(gpio_);
   Serial.print(" level: ");
-  Serial.println(digitalRead(gpio_));
+  Serial.println(level);
 
   if (is_button_toogle(key_willing)) {
     willing_on = !willing_on;
   }
-
+  static int last;
   if (level) {
+    last = 1;
     // Serial.println("level = 1");
     #if !TEST_OLED
     save_record();
     #else
     delay(1000);
     #endif
-  } else if (last_level) {
+  } else if (last) {
     #if !TEST_OLED
     end_record();
     #else
     delay(1000);
     #endif
-    last_level = 0;
+    last = 0;
   }
   // graph_end_record();
   // last_level = level;
@@ -338,12 +340,13 @@ void loop() {
 
 void task1(void *pvParameters) {
   while (1) {
-    if (is_button_toogle2(gpio_) && digitalRead(gpio_)) {
+    if (is_button_toogle2(gpio_) && digitalRead(gpio_) == 0) {
       Serial.println("Button toogled!");
       level = !level;
     }
-    
+    // Serial.println("task1..");
     if (level) {
+      Serial.println("level = 1");
       graph_record();
     } else if (last_level) {
       graph_end_record();
