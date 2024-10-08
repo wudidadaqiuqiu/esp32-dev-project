@@ -30,12 +30,15 @@ static int start_tran = 0;
 const int waveDataSize = record_time * 88200;
 int32_t communicationData[1024];     //接收缓冲区
 char partWavData[1024];
-IPAddress serverIP(192, 168, 248, 29);
+IPAddress serverIP(192, 168, 27, 29);
 uint16_t serverPort = 3334;
 uint16_t server_end_port = 3335;
+uint16_t server_start_port = 3337;
+
 
 WiFiClient client;
 WiFiClient end_client;
+WiFiClient start_client;
 
 const int gpio_ = 13;
 const int key_willing = 32;
@@ -44,14 +47,16 @@ int debounce_button(int gp);
 int is_button_toogle2(int gp);
 int is_button_toogle(int gp); 
 void connect_wifi() {
+  Serial.println("Connecting to WiFi...");
   static int cnt;
   while (WiFi.status() != WL_CONNECTED) {
-    delay(2000);
+    delay(5);
     cnt++;
     Serial.print(".");
     if (cnt > 5) {
       cnt = 0;
       on_off = 0;
+      Serial.println("WiFi connection failed");
       return;
     }
   }
@@ -100,6 +105,10 @@ void graph_setup() {
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_ncenB12_tr);        //设定字体
   u8g2.drawStr(0, 13, "recorder");       //在指定位置显示字符串
+    u8g2.setCursor(0, 47);
+  u8g2.println(willing_on);
+  u8g2.setCursor(0, 64);
+  u8g2.print(on_off ? "on" : "off");
   u8g2.sendBuffer();
 }
 void graph_record() {
@@ -112,9 +121,11 @@ void graph_record() {
   u8g2.drawStr(0, 13, "Recording");       //在指定位置显示字符串
   u8g2.setCursor(0, 30);
   
-  u8g2.println(end - start);
+  u8g2.println((end - start) / 1000);
   u8g2.setCursor(0, 47);
   u8g2.println(willing_on);
+  u8g2.setCursor(0, 64);
+  u8g2.println(on_off ? "on" : "off");
   u8g2.sendBuffer();
 }
 
@@ -126,7 +137,11 @@ void graph_end_record() {
   u8g2.setFont(u8g2_font_ncenB12_tr);        //设定字体
   u8g2.drawStr(0, 13, "Record End");       //在指定位置显示字符串
   u8g2.setCursor(0, 30);
-  u8g2.print(duration);
+  u8g2.print(duration / 1000 / 10 * 10 + 10);
+  u8g2.setCursor(0, 47);
+  u8g2.println(willing_on);
+  u8g2.setCursor(0, 64);
+  u8g2.println(on_off ? "on" : "off");
   u8g2.sendBuffer();
 }
 
@@ -159,7 +174,7 @@ void end_record() {
 
 void save_record() {
   String path = "/record" + String(EEPROM.read(0)) + ".wav";
-  if (willing_on) {
+  if (willing_on && !on_off) {
     connect_wifi();
   }
   if (willing_on && on_off) {
@@ -170,13 +185,13 @@ void save_record() {
     }
     start_tran = 1;
   }
-
+  Serial.println("save record");
   //删除并创建文件
   sd.remove(path.c_str());
   file = sd.open(path.c_str(), O_WRITE|O_CREAT);
   if(!file)
   {
-    Serial.println("crate file error");
+    Serial.println("crate file error" + path);
     return;
   }
 
@@ -217,6 +232,7 @@ void save_record() {
     }
   }
   file.close();
+  Serial.println(path);
   if (willing_on && on_off) {
     client.flush();
     client.stop();
@@ -289,7 +305,7 @@ void setup() {
   // client.stop();
   
   pinMode(gpio_, INPUT_PULLUP);
-  pinMode(key_willing, INPUT);
+  pinMode(key_willing, INPUT_PULLUP);
   
   u8g2_setup();
   graph_setup();
@@ -313,9 +329,6 @@ void loop() {
   Serial.print(" level: ");
   Serial.println(level);
 
-  if (is_button_toogle(key_willing)) {
-    willing_on = !willing_on;
-  }
   static int last;
   if (level) {
     last = 1;
@@ -344,12 +357,42 @@ void task1(void *pvParameters) {
       Serial.println("Button toogled!");
       level = !level;
     }
+    if (is_button_toogle(key_willing) && digitalRead(key_willing) == 0) {
+      willing_on = !willing_on;
+    }
+
+    if (willing_on && !on_off) {
+      connect_wifi();
+    }
+    if (willing_on && on_off) {
+      int cnt = 0;
+      while (!start_client.connected()) {
+        start_client.connect(serverIP, server_start_port, 50);
+        Serial.println("start port connecting.");
+        cnt++;
+        if (cnt > 5) {
+          break;
+        }
+      }
+      // Serial.println("start port connected.");
+    }
+
+    if (start_client.connected() && start_client.peek() != -1) {
+      // start_client.readBytes((char *)&start, sizeof(start));
+      start_client.read();
+      start_client.flush();
+      Serial.println("start received.");
+      level = !level;
+      // on_off = true;
+    }
     // Serial.println("task1..");
     if (level) {
       Serial.println("level = 1");
       graph_record();
     } else if (last_level) {
       graph_end_record();
+    } else {
+      graph_setup();
     }
     last_level = level;
     vTaskDelay(1);
